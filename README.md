@@ -5,6 +5,20 @@ The WebGL test case extracted from the
 benchmark in the [WebKit](https://webkit.org/) repository. It has been
 removed from the overall harness to set the workload at a fixed size.
 
+# Keeping the gh-pages branch up to date
+
+gh-pages in this repository exactly tracks master. To ensure this,
+make the following edit to your .git/config (new lines are in
+**bold**):
+
+<pre>
+[remote "origin"]
+    url = https://github.com/kenrussell/webgl-animometer.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+    <b>push = +refs/heads/master:refs/heads/gh-pages</b>
+    <b>push = +refs/heads/master:refs/heads/master</b>
+</pre>
+
 # LICENSE
 
 Portions of WebKit are licensed under the GNU LGPL and BSD licenses.
