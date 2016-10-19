@@ -5,6 +5,21 @@ The WebGL test case extracted from the
 benchmark in the [WebKit](https://webkit.org/) repository. It has been
 removed from the overall harness to set the workload at a fixed size.
 
+# Running within Chromium
+
+This page is part of Chromium's
+[`tough_webgl_cases`](https://chromium.googlesource.com/chromium/src/+/master/tools/perf/page_sets/tough_webgl_cases.py)
+performance tests. To run that entire benchmark within that
+repository, assuming you've built Chromium in Release mode and are
+cd'd into <code>src</code>:
+
+<pre>
+./tools/perf/run_benchmark --browser=release smoothness.tough_webgl_cases &gt; output.txt
+</pre>
+
+Look for the `mean_frame_times` measurement in particular; that is a
+good indicator of how quickly and reliably the benchmark ran.
+
 # Keeping the gh-pages branch up to date
 
 gh-pages in this repository exactly tracks master. To ensure this,
