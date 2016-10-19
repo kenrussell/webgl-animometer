@@ -20,6 +20,16 @@ cd'd into <code>src</code>:
 Look for the `mean_frame_times` measurement in particular; that is a
 good indicator of how quickly and reliably the benchmark ran.
 
+# Re-recording the WPR
+
+Sometimes it's necessary to re-record the web page replay (WPR)
+archive in order to run the new version of the test. In this case,
+update the page set with the new URL, and run:
+
+<pre>
+./tools/perf/record_wpr --upload --browser=system tough_webgl_cases_page_set
+</pre>
+
 # Keeping the gh-pages branch up to date
 
 gh-pages in this repository exactly tracks master. To ensure this,
