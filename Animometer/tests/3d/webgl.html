@@ -43,6 +43,58 @@ void main() {
     gl_Position = vec4(xpos, ypos, 0.0, 1.0);
 }
     </script>
+    <script id="vertex-with-ubos" type="x-shader/x-glsl">#version 300 es
+#extension GL_ANGLE_multi_draw  : require
+
+in vec4 position;
+in vec4 color;
+
+uniform float time;
+
+struct DrawInfo {
+  float scale;
+  float offsetX;
+  float offsetY;
+  float scalar;
+  float scalarOffset;
+  float pad0;
+  float pad1;
+  float pad2;
+};
+
+layout(std140) uniform DrawData { DrawInfo values[MAX_ARRAY_SIZE]; } data;
+
+out vec4 v_color;
+
+void main() {
+    float scale        = data.values[gl_DrawID].scale;
+    float offsetX      = data.values[gl_DrawID].offsetX;
+    float offsetY      = data.values[gl_DrawID].offsetY;
+    float scalar       = data.values[gl_DrawID].scalar;
+    float scalarOffset = data.values[gl_DrawID].scalarOffset;
+
+    float fade = mod(scalarOffset + time * scalar / 10.0, 1.0);
+
+    if (fade < 0.5) {
+        fade = fade * 2.0;
+    } else {
+        fade = (1.0 - fade) * 2.0;
+    }
+
+    float xpos = position.x * scale;
+    float ypos = position.y * scale;
+
+    float angle = 3.14159 * 2.0 * fade;
+    float xrot = xpos * cos(angle) - ypos * sin(angle);
+    float yrot = xpos * sin(angle) + ypos * cos(angle);
+
+    xpos = xrot + offsetX;
+    ypos = yrot + offsetY;
+
+    v_color = vec4(fade, 1.0 - fade, 0.0, 1.0) + color;
+    gl_Position = vec4(xpos, ypos, 0.0, 1.0);
+}
+    </script>
     <script id="vertex-with-attributes" type="x-shader/x-glsl">
 attribute vec4 position;
 attribute vec4 color;
@@ -89,6 +141,18 @@ varying vec4 v_color;
 
 void main() {
     gl_FragColor = v_color;
+}
+    </script>
+    <script id="fragment-300es" type="x-shader/x-glsl">#version 300 es
+#ifdef GL_ES
+precision mediump float;
+#endif
+
+in vec4 v_color;
+out vec4 FragColor;
+
+void main() {
+    FragColor = v_color;
 }
     </script>
     <script src="../../resources/strings.js"></script>
