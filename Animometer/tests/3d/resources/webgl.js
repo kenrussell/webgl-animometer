@@ -1,5 +1,9 @@
 (function() {
 
+function WebGL2Supported() {
+   return typeof WebGL2RenderingContext !== "undefined";
+}
+
 WebGLStage = Utilities.createSubclass(Stage,
     function(element, options)
     {
@@ -14,17 +18,41 @@ WebGLStage = Utilities.createSubclass(Stage,
             var params = new URL(location.href).searchParams;
             this._params = {
                 use_attributes: Boolean(params.get("use_attributes")),
-                multi_draw: Boolean(params.get("multi_draw")),
+                use_ubos: Boolean(params.get("use_ubos")),
+                use_multi_draw: Boolean(params.get("use_multi_draw")),
+                webgl_version: WebGL2Supported() ? (Number(params.get("webgl_version")) || 1) : 1,
             };
+
+            if (this._params.webgl_version == 2) {
+                this._gl = this.element.getContext("webgl2");
+            } else {
+                this._gl = this.element.getContext("webgl");
+            }
+            var gl = this._gl;
+
+            this._multi_draw = this._params.use_multi_draw && gl.getExtension("WEBGL_multi_draw");
+            if (this._params.use_multi_draw && !this._multi_draw) {
+                console.warn("Disabling use_multi_draw. Extension not available.");
+                this._params.use_multi_draw = false;
+            }
+            if (this._params.use_ubos && this._params.webgl_version !== 2) {
+                console.warn("Disabling use_ubos. webgl_version is not 2.");
+                this._params.use_ubos = false;
+            }
+            if (this._params.use_ubos && !this._params.use_multi_draw) {
+                console.warn("Disabling use_ubos. use_multi_draw not enabled.");
+                this._params.use_ubos = false;
+            }
+            if (this._params.use_multi_draw && !(this._params.use_ubos || this._params.use_attributes)) {
+                const flag = this._params.webgl_version == 2 ? "use_ubos" : "use_attributes";
+                console.warn("Defaulting to " + flag);
+                this._params[flag] = true;
+            }
 
             this._numTriangles = 0;
             this._bufferSize = 0;
 
-            this._gl = this.element.getContext("webgl");
-            var gl = this._gl;
-
-            this._params.multi_draw = this._params.multi_draw && gl.getExtension("WEBGL_multi_draw");
-            this._params.use_attributes = this._params.use_attributes || Boolean(this._params.multi_draw);
+            var use_ubos = this._params.use_ubos;
             var use_attributes = this._params.use_attributes;
 
             gl.clearColor(0.5, 0.5, 0.5, 1);
@@ -33,7 +61,12 @@ WebGLStage = Utilities.createSubclass(Stage,
             var vertexShader = gl.createShader(gl.VERTEX_SHADER);
 
             // The source code for the shader is extracted from the <script> element above.
-            if (use_attributes) {
+            if (use_ubos) {
+                let source = this._getFunctionSource("vertex-with-ubos");
+                this._maxUniformArraySize = Math.floor(gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE) / (8 * 4));
+                source = source.replace('MAX_ARRAY_SIZE', this._maxUniformArraySize);
+                gl.shaderSource(vertexShader, source);
+            } else if (use_attributes) {
                 gl.shaderSource(vertexShader, this._getFunctionSource("vertex-with-attributes"));
             } else {
                 gl.shaderSource(vertexShader, this._getFunctionSource("vertex-with-uniforms"));
@@ -50,7 +83,11 @@ WebGLStage = Utilities.createSubclass(Stage,
 
             // Now do the fragment shader.
             var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-            gl.shaderSource(fragmentShader, this._getFunctionSource("fragment"));
+            if (use_ubos) {
+                gl.shaderSource(fragmentShader, this._getFunctionSource("fragment-300es"));
+            } else {
+                gl.shaderSource(fragmentShader, this._getFunctionSource("fragment"));
+            }
             gl.compileShader(fragmentShader);
             if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
                 console.error("Fragment Shader failed to compile.");
@@ -66,6 +103,7 @@ WebGLStage = Utilities.createSubclass(Stage,
 
             if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
                 console.error("Unable to link shaders into program.");
+                console.error(gl.getProgramInfoLog(program));
                 return;
             }
 
@@ -74,7 +112,10 @@ WebGLStage = Utilities.createSubclass(Stage,
 
             gl.useProgram(program);
             this._uTime = gl.getUniformLocation(program, "time");
-            if (use_attributes) {
+            if (use_ubos) {
+                const blockIndex = gl.getUniformBlockIndex(program, "DrawData");
+                gl.uniformBlockBinding(program, blockIndex, 0);
+            } else if (use_attributes) {
                 this._aScale = gl.getAttribLocation(program, "scale");
                 this._aOffsetX = gl.getAttribLocation(program, "offsetX");
                 this._aOffsetY = gl.getAttribLocation(program, "offsetY");
@@ -113,7 +154,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                 0, 0, 1, 1
             ]);
 
-            if (!use_attributes) {
+            if (!use_attributes && !use_ubos) {
                 this._positionBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
                 gl.bufferData(gl.ARRAY_BUFFER, this._positionData, gl.STATIC_DRAW);
@@ -144,13 +185,75 @@ WebGLStage = Utilities.createSubclass(Stage,
                 this._bufferSize *= 4;
 
             var use_attributes = this._params.use_attributes;
-            if (use_attributes) {
+            var use_ubos = this._params.use_ubos;
+            var use_multi_draw = this._params.use_multi_draw;
+
+            if (use_multi_draw) {
+                this._multi_draw_firsts = new Int32Array(this._bufferSize);
+                this._multi_draw_counts = new Int32Array(this._bufferSize);
+                for (var i = 0; i < this._bufferSize; ++i) {
+                    this._multi_draw_firsts[i] = i * 3;
+                }
+                this._multi_draw_counts.fill(3);
+            }
+
+            if (use_multi_draw || use_attributes) {
                 var positionData = new Float32Array(this._bufferSize * this._positionData.length);
                 var colorData = new Float32Array(this._bufferSize * this._colorData.length);
-                this._transformData = new Float32Array(this._bufferSize * 5 * 3);
                 for (var i = 0; i < this._bufferSize; ++i) {
                     positionData.set(this._positionData, i * this._positionData.length);
                     colorData.set(this._colorData, i * this._colorData.length);
+                }
+
+                this._positionBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, positionData, gl.STATIC_DRAW);
+
+                this._colorBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, colorData, gl.STATIC_DRAW);
+
+                // Bind for draw
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
+                gl.vertexAttribPointer(this._aPosition, 4, gl.FLOAT, false, 0, 0);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
+                gl.vertexAttribPointer(this._aColor, 4, gl.FLOAT, false, 0, 0);
+            }
+
+
+            if (use_ubos) {
+                this._transformData = new Float32Array(this._bufferSize * 8);
+                for (var i = 0; i < this._bufferSize; ++i) {
+                    var scale = Stage.random(0.2, 0.4);
+                    var offsetX = Stage.random(-0.9, 0.9);
+                    var offsetY = Stage.random(-0.9, 0.9);
+                    var scalar = Stage.random(0.5, 2);
+                    var scalarOffset = Stage.random(0, 10);
+
+                    this._transformData[i * 8 + 0] = scale;
+                    this._transformData[i * 8 + 1] = offsetX;
+                    this._transformData[i * 8 + 2] = offsetY;
+                    this._transformData[i * 8 + 3] = scalar;
+                    this._transformData[i * 8 + 4] = scalarOffset;
+                }
+
+                const uniformBufferCount = Math.ceil(this._bufferSize / this._maxUniformArraySize);
+                this._uniformBuffers = new Array(uniformBufferCount);
+                for (let i = 0; i < uniformBufferCount; ++i) {
+                    const buffer = gl.createBuffer();
+                    gl.bindBuffer(gl.UNIFORM_BUFFER, buffer);
+                    gl.bufferData(gl.UNIFORM_BUFFER, this._transformData.slice(
+                      this._maxUniformArraySize * 8 * i,
+                      this._maxUniformArraySize * 8 * (i + 1),
+                    ), gl.STATIC_DRAW);
+                    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+                    this._uniformBuffers[i] = buffer;
+                }
+
+            } else if (use_attributes) {
+                this._transformData = new Float32Array(this._bufferSize * 5 * 3);
+                for (var i = 0; i < this._bufferSize; ++i) {
                     var scale = Stage.random(0.2, 0.4);
                     var offsetX = Stage.random(-0.9, 0.9);
                     var offsetY = Stage.random(-0.9, 0.9);
@@ -165,24 +268,9 @@ WebGLStage = Utilities.createSubclass(Stage,
                     }
                 }
 
-                this._positionBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
-                gl.bufferData(gl.ARRAY_BUFFER, positionData, gl.STATIC_DRAW);
-
-                this._colorBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
-                gl.bufferData(gl.ARRAY_BUFFER, colorData, gl.STATIC_DRAW);
-
                 this._transformBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, this._transformBuffer);
                 gl.bufferData(gl.ARRAY_BUFFER, this._transformData, gl.STATIC_DRAW);
-
-                // Bind for draw
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
-                gl.vertexAttribPointer(this._aPosition, 4, gl.FLOAT, false, 0, 0);
-
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
-                gl.vertexAttribPointer(this._aColor, 4, gl.FLOAT, false, 0, 0);
 
                 gl.bindBuffer(gl.ARRAY_BUFFER, this._transformBuffer);
                 gl.vertexAttribPointer(this._aScale,        1, gl.FLOAT, false, 5 * 4, 0 * 4);
@@ -190,14 +278,6 @@ WebGLStage = Utilities.createSubclass(Stage,
                 gl.vertexAttribPointer(this._aOffsetY,      1, gl.FLOAT, false, 5 * 4, 2 * 4);
                 gl.vertexAttribPointer(this._aScalar,       1, gl.FLOAT, false, 5 * 4, 3 * 4);
                 gl.vertexAttribPointer(this._aScalarOffset, 1, gl.FLOAT, false, 5 * 4, 4 * 4);
-
-                this._multi_draw_firsts = new Int32Array(this._bufferSize);
-                this._multi_draw_counts = new Int32Array(this._bufferSize);
-                for (var i = 0; i < this._bufferSize; ++i) {
-                    this._multi_draw_firsts[i] = i * 3;
-                }
-                this._multi_draw_counts.fill(3);
-
             } else {
                 this._uniformData = new Float32Array(this._bufferSize * 6);
                 for (var i = 0; i < this._bufferSize; ++i) {
@@ -208,14 +288,14 @@ WebGLStage = Utilities.createSubclass(Stage,
                     this._uniformData[i * 6 + 4] = Stage.random(0.5, 2);
                     this._uniformData[i * 6 + 5] = Stage.random(0, 10);
                 }
+            }
 
-                // Bind for draw
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
-                gl.vertexAttribPointer(this._aPosition, 4, gl.FLOAT, false, 0, 0);
+            // Bind for draw
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._positionBuffer);
+            gl.vertexAttribPointer(this._aPosition, 4, gl.FLOAT, false, 0, 0);
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
-                gl.vertexAttribPointer(this._aColor, 4, gl.FLOAT, false, 0, 0);
-              }
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._colorBuffer);
+            gl.vertexAttribPointer(this._aColor, 4, gl.FLOAT, false, 0, 0);
         },
 
         tune: function(count)
@@ -239,13 +319,24 @@ WebGLStage = Utilities.createSubclass(Stage,
                 this._startTime = Stage.dateCounterValue(1000);
             var elapsedTime = Stage.dateCounterValue(1000) - this._startTime;
 
-            if (this._params.multi_draw) {
+            if (this._params.use_multi_draw) {
                 gl.uniform1f(this._uTime, elapsedTime);
-                this._params.multi_draw.multiDrawArraysWEBGL(
-                    gl.TRIANGLES,
-                    this._multi_draw_firsts, 0,
-                    this._multi_draw_counts, 0,
-                    this._numTriangles);
+                if (this._params.use_ubos) {
+                    for (let chunk = 0; chunk < Math.ceil(this._numTriangles / this._maxUniformArraySize); chunk++) {
+                        gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this._uniformBuffers[chunk]);
+                        this._multi_draw.multiDrawArraysWEBGL(
+                          gl.TRIANGLES,
+                          this._multi_draw_firsts, chunk * this._maxUniformArraySize,
+                          this._multi_draw_counts, chunk * this._maxUniformArraySize,
+                          this._maxUniformArraySize);
+                    }
+                } else {
+                    this._multi_draw.multiDrawArraysWEBGL(
+                        gl.TRIANGLES,
+                        this._multi_draw_firsts, 0,
+                        this._multi_draw_counts, 0,
+                        this._numTriangles);
+                }
             } else if (this._params.use_attributes) {
                 gl.uniform1f(this._uTime, elapsedTime);
                 for (var i = 0; i < this._numTriangles; ++i) {
