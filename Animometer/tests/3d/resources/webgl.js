@@ -63,7 +63,9 @@ WebGLStage = Utilities.createSubclass(Stage,
             // The source code for the shader is extracted from the <script> element above.
             if (use_ubos) {
                 let source = this._getFunctionSource("vertex-with-ubos");
-                this._maxUniformArraySize = Math.floor(gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE) / (8 * 4));
+                this._maxUniformArraySize = Math.floor(
+                    gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE) /
+                    (8 * Float32Array.BYTES_PER_ELEMENT));
                 source = source.replace('MAX_ARRAY_SIZE', this._maxUniformArraySize);
                 gl.shaderSource(vertexShader, source);
             } else if (use_attributes) {
