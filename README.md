@@ -30,6 +30,10 @@ update the page set with the new URL, and run:
 ./tools/perf/record_wpr --upload --browser=system rendering_desktop --story_filter=animometer_webgl
 </pre>
 
+<!-- <pre>
+./tools/perf/record_wpr --upload --browser=system tough_webgl_cases_page_set
+</pre> -->
+
 # Keeping the gh-pages branch up to date
 
 gh-pages in this repository exactly tracks master. To ensure this,

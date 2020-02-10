@@ -154,12 +154,14 @@ void main() {
     <script src="../../resources/statistics.js"></script>
     <script src="../resources/math.js"></script>
     <script src="../resources/main.js"></script>
-    <script src="resources/webgl.js"></script>
-    <!-- <script src="resources/webgl-o.js"></script> -->
+    <script src="resources/webgl-indexed-instanced.js"></script>
     <script>
 var b = new WebGLStage;
 b.initialize();
-b.tune(20000);
+// b.tune(20000);
+// b.tune(40000);
+b.tune(80000);
+// b.tune(2048);
 var lastTime = 0.0;
 function cb(timeStamp) {
   var timeDelta = 0.0;
