@@ -8,16 +8,16 @@ removed from the overall harness to set the workload at a fixed size.
 # Running within Chromium
 
 This page is part of Chromium's
-[`tough_webgl_cases`](https://chromium.googlesource.com/chromium/src/+/master/tools/perf/page_sets/tough_webgl_cases.py)
+[`tough_webgl_cases`](https://source.chromium.org/chromium/chromium/src/+/master:tools/perf/page_sets/rendering/tough_webgl_cases.py)
 performance tests. To run that entire benchmark within that
 repository, assuming you've built Chromium in Release mode and are
 cd'd into <code>src</code>:
 
 <pre>
-./tools/perf/run_benchmark --browser=release smoothness.tough_webgl_cases &gt; output.txt
+./tools/perf/run_benchmark --browser=release rendering.desktop --story=animometer_webgl &gt; output.txt
 </pre>
 
-Look for the `mean_frame_times` measurement in particular; that is a
+Look for the `frame_times` measurement in particular; that is a
 good indicator of how quickly and reliably the benchmark ran.
 
 # Re-recording the WPR
@@ -27,7 +27,7 @@ archive in order to run the new version of the test. In this case,
 update the page set with the new URL, and run:
 
 <pre>
-./tools/perf/record_wpr --upload --browser=system tough_webgl_cases_page_set
+./tools/perf/record_wpr --upload --browser=system rendering_desktop --story_filter=animometer_webgl
 </pre>
 
 # Keeping the gh-pages branch up to date
