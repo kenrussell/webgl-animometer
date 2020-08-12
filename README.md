@@ -27,12 +27,8 @@ archive in order to run the new version of the test. In this case,
 update the page set with the new URL, and run:
 
 <pre>
-./tools/perf/record_wpr --upload --browser=system rendering_desktop --story_filter=animometer_webgl
+./tools/perf/record_wpr --upload --browser=system rendering_desktop --story-filter=animometer_webgl
 </pre>
-
-<!-- <pre>
-./tools/perf/record_wpr --upload --browser=system tough_webgl_cases_page_set
-</pre> -->
 
 # Keeping the gh-pages branch up to date
 
