@@ -54,6 +54,11 @@ WebGLStage = Utilities.createSubclass(Stage,
             this._multi_draw = this._params.use_multi_draw && gl.getExtension("WEBGL_multi_draw");
             this._draw_base_vertex_base_instance = !this._params.use_multi_draw && this._params.use_base_vertex_base_instance && gl.getExtension("WEBGL_draw_instanced_base_vertex_base_instance");
             this._multi_draw_base_vertex_base_instance = this._params.use_multi_draw && this._params.use_base_vertex_base_instance && gl.getExtension("WEBGL_multi_draw_instanced_base_vertex_base_instance");
+            
+            // console.log(this._multi_draw);
+            // console.log(this._draw_base_vertex_base_instance);
+            // console.log(this._multi_draw_base_vertex_base_instance);
+            
             // if (this._params.use_base_vertex_base_instance && !this._multi_draw_base_vertex_base_instance) {
             if ( this._params.use_base_vertex_base_instance && !(this._draw_base_vertex_base_instance || this._multi_draw_base_vertex_base_instance) ) {
                 console.warn("Disabling use_base_vertex_base_instance. Extension not available.");
@@ -77,6 +82,9 @@ WebGLStage = Utilities.createSubclass(Stage,
                 this._params[flag] = true;
             }
 
+            console.log(this._params.use_base_vertex_base_instance);
+            console.log(this._params.use_multi_draw);
+
             // this._numTriangles = 0;
             // this._bufferSize = 0;
 
@@ -86,7 +94,8 @@ WebGLStage = Utilities.createSubclass(Stage,
             // this._drawListUpdateFrameInterval = 50;
             // this._drawListUpdateFrameInterval = 20;
             // this._drawListUpdateFrameInterval = 10;
-            this._drawListUpdateFrameInterval = 5;
+            // this._drawListUpdateFrameInterval = 5;
+            this._drawListUpdateFrameInterval = 1;
             this._drawListUpdateCountdown = this._drawListUpdateFrameInterval;
             this._numDrawingObjects = 0;
 
@@ -257,13 +266,13 @@ WebGLStage = Utilities.createSubclass(Stage,
             // this._bufferSize = this._numTriangles;
 
             this._drawListSet.push([...Array(this._numTriangles).keys()]);
-            // this._drawListSet.push([10, 20, 30, 1000]);    // all wrong (except 0)
+            this._drawListSet.push([10, 20, 30, 1000]);
             // // this._drawListSet.push([0]);
             // // this._drawListSet.push([10]);
             // this._drawListSet.push([2,3,4,5,6,7,8,9,10]);    // mbvbi = raw, m has wrong shape(id offset)
-            // this._drawListSet.push([...Array(this._numTriangles / 4).keys()]);
-            // this._drawListSet.push([...Array(this._numTriangles / 2).keys()].map(x => x + 100));
-            // this._drawListSet.push([...Array(this._numTriangles / 8).keys()].map(x => x * 4));
+            this._drawListSet.push([...Array(this._numTriangles / 4).keys()]);
+            this._drawListSet.push([...Array(this._numTriangles / 2).keys()].map(x => x + 100));
+            this._drawListSet.push([...Array(this._numTriangles / 8).keys()].map(x => x * 4));
             // // console.log(this._drawListSet);
 
             // this._drawListSet.push([0]);
