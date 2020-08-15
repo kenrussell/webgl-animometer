@@ -11,7 +11,8 @@ WebGLStage = Utilities.createSubclass(Stage,
     },
     {
 
-        initialize: function(benchmark, options)
+        initialize: function(count, benchmark, options)
+        // initialize: function(benchmark, options)
         {
             Stage.prototype.initialize.call(this, benchmark, options);
 
@@ -31,7 +32,24 @@ WebGLStage = Utilities.createSubclass(Stage,
             }
             var gl = this._gl;
 
-            let ext_index_uint = gl.getExtension("OES_element_index_uint");
+            this._numTriangles = Math.max(count, 0);
+            this._use_element_index_uint = false;
+            console.log("numTriangles: " + this._numTriangles);
+            // if (this._numTriangles * 3 > (1 << 16)) {
+                console.log("use gl.UNSIGNED_INT");
+                // unsigned int index is always available in WebGL 2
+                this._use_element_index_uint = true;
+                // var ext = gl.getExtension("OES_element_index_uint");
+                // this._use_element_index_uint = !!gl.getExtension("OES_element_index_uint");
+                // if (!this._use_element_index_uint) {
+                //     console.warn("OES_element_index_uint is not available, too many vertices");
+                // }
+            // } else {
+            //     console.log("use gl.UNSIGNED_SHORT");
+            //     this._use_element_index_uint = false;
+            // }
+            this._elements_type = this._use_element_index_uint ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+            this._elements_typed_array_class = this._use_element_index_uint ? Uint32Array : Uint16Array;
 
             this._multi_draw = this._params.use_multi_draw && gl.getExtension("WEBGL_multi_draw");
             this._draw_base_vertex_base_instance = !this._params.use_multi_draw && this._params.use_base_vertex_base_instance && gl.getExtension("WEBGL_draw_instanced_base_vertex_base_instance");
@@ -59,8 +77,8 @@ WebGLStage = Utilities.createSubclass(Stage,
                 this._params[flag] = true;
             }
 
-            this._numTriangles = 0;
-            this._bufferSize = 0;
+            // this._numTriangles = 0;
+            // this._bufferSize = 0;
 
             // storing object id (order in the index buffer) that needs rendering for current frame
             this._drawList = [];
@@ -83,6 +101,23 @@ WebGLStage = Utilities.createSubclass(Stage,
 
             var use_ubos = this._params.use_ubos;
             var use_attributes = this._params.use_attributes;
+
+            // if (!this._bufferSize)
+            //     this._bufferSize = 128;
+
+            // while (this._numTriangles > this._bufferSize)
+            //     this._bufferSize *= 4;
+            if (use_ubos) {
+                if (!this._bufferSize)
+                    this._bufferSize = 128;
+
+                while (this._numTriangles > this._bufferSize)
+                    this._bufferSize *= 4;
+            } else {
+                this._bufferSize = this._numTriangles;
+            }
+
+            console.log("bufferSize: " + this._bufferSize);
 
             gl.clearColor(0.5, 0.5, 0.5, 1);
 
@@ -185,7 +220,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                 0, 0, 1, 1
             ]);
 
-            this._indexData = new Uint32Array([
+            this._indexData = new this._elements_typed_array_class([
                 0, 1, 2
                 // 3, 4, 5
                 // 6, 7, 8
@@ -195,6 +230,8 @@ WebGLStage = Utilities.createSubclass(Stage,
             //     // 3, 4, 5
             //     // 6, 7, 8
             // ]);
+
+            this._resetIfNecessary();
         },
 
         _getFunctionSource: function(id)
@@ -205,23 +242,28 @@ WebGLStage = Utilities.createSubclass(Stage,
         _resetIfNecessary: function()
         {
             var gl = this._gl;
-            if (this._numTriangles <= this._bufferSize)
-                return;
 
-            if (!this._bufferSize)
-                this._bufferSize = 128;
 
-            while (this._numTriangles > this._bufferSize)
-                this._bufferSize *= 4;
+            // if (this._numTriangles <= this._bufferSize)
+            //     return;
+
+            // if (!this._bufferSize)
+            //     this._bufferSize = 128;
+
+            // while (this._numTriangles > this._bufferSize)
+            //     this._bufferSize *= 4;
+
+            // temp
+            // this._bufferSize = this._numTriangles;
 
             this._drawListSet.push([...Array(this._numTriangles).keys()]);
             // this._drawListSet.push([10, 20, 30, 1000]);    // all wrong (except 0)
             // // this._drawListSet.push([0]);
             // // this._drawListSet.push([10]);
-            this._drawListSet.push([2,3,4,5,6,7,8,9,10]);    // mbvbi = raw, m has wrong shape(id offset)
-            this._drawListSet.push([...Array(this._numTriangles / 4).keys()]);
-            this._drawListSet.push([...Array(this._numTriangles / 2).keys()].map(x => x + 100));
-            this._drawListSet.push([...Array(this._numTriangles / 8).keys()].map(x => x * 4));
+            // this._drawListSet.push([2,3,4,5,6,7,8,9,10]);    // mbvbi = raw, m has wrong shape(id offset)
+            // this._drawListSet.push([...Array(this._numTriangles / 4).keys()]);
+            // this._drawListSet.push([...Array(this._numTriangles / 2).keys()].map(x => x + 100));
+            // this._drawListSet.push([...Array(this._numTriangles / 8).keys()].map(x => x * 4));
             // // console.log(this._drawListSet);
 
             // this._drawListSet.push([0]);
@@ -243,7 +285,7 @@ WebGLStage = Utilities.createSubclass(Stage,
             var positionData = new Float32Array(this._bufferSize * this._positionData.length);
             var colorData = new Float32Array(this._bufferSize * this._colorData.length);
             // var indexData = new Uint16Array(this._bufferSize * this._indexData.length);
-            var indexData = new Uint32Array(this._bufferSize * this._indexData.length);
+            var indexData = new this._elements_typed_array_class(this._bufferSize * this._indexData.length);
 
             for (let i = 0; i < this._bufferSize; ++i) {
                 // positionData.set(this._positionData, i * this._positionData.length);
@@ -306,7 +348,7 @@ WebGLStage = Utilities.createSubclass(Stage,
             if (!use_base_vertex_base_instance) {
                 // indexData = new Uint16Array(this._bufferSize * this._indexData.length);
                 // this._currentIndexData = new Uint16Array(this._bufferSize * this._indexData.length);
-                this._currentIndexData = new Uint32Array(this._bufferSize * this._indexData.length);
+                this._currentIndexData = new this._elements_typed_array_class(this._bufferSize * this._indexData.length);
                 this._originalIndexData = indexData;
                 
                 // Indices data here are added with extra offset
@@ -370,12 +412,12 @@ WebGLStage = Utilities.createSubclass(Stage,
 
             } else if (use_attributes) {
                 console.log('use_attributes setup');
-                console.log(this._bufferSize);
-                console.log(this._numTriangles);
-                // this._transformData = new Float32Array(this._bufferSize * 5 * 3);
-                // for (let i = 0; i < this._bufferSize; ++i) {
-                this._transformData = new Float32Array(this._numTriangles * 5 * 3);
-                for (let i = 0; i < this._numTriangles; ++i) {
+                // console.log(this._bufferSize);
+                // console.log(this._numTriangles);
+                this._transformData = new Float32Array(this._bufferSize * 5 * 3);
+                for (let i = 0; i < this._bufferSize; ++i) {
+                // this._transformData = new Float32Array(this._numTriangles * 5 * 3);
+                // for (let i = 0; i < this._numTriangles; ++i) {
                     var scale = Stage.random(0.2, 0.4);
                     var offsetX = Stage.random(-0.9, 0.9);
                     var offsetY = Stage.random(-0.9, 0.9);
@@ -401,10 +443,10 @@ WebGLStage = Utilities.createSubclass(Stage,
                 gl.vertexAttribPointer(this._aScalar,       1, gl.FLOAT, false, 5 * 4, 3 * 4);
                 gl.vertexAttribPointer(this._aScalarOffset, 1, gl.FLOAT, false, 5 * 4, 4 * 4);
             } else {
-                // this._uniformData = new Float32Array(this._bufferSize * 6);
-                // for (let i = 0; i < this._bufferSize; ++i) {
-                this._uniformData = new Float32Array(this._numTriangles * 6);
-                for (let i = 0; i < this._numTriangles; ++i) {
+                this._uniformData = new Float32Array(this._bufferSize * 6);
+                for (let i = 0; i < this._bufferSize; ++i) {
+                // this._uniformData = new Float32Array(this._numTriangles * 6);
+                // for (let i = 0; i < this._numTriangles; ++i) {
                     this._uniformData[i * 6 + 0] = Stage.random(0.2, 0.4);
                     this._uniformData[i * 6 + 1] = 0;
                     this._uniformData[i * 6 + 2] = Stage.random(-0.9, 0.9);
@@ -444,17 +486,17 @@ WebGLStage = Utilities.createSubclass(Stage,
             // console.log('------------reset----------');
         },
 
-        tune: function(count)
-        {
-            if (!count)
-                return;
+        // tune: function(count)
+        // {
+        //     if (!count)
+        //         return;
 
-            // this._numTriangles += count;
-            this._numTriangles = count;
-            this._numTriangles = Math.max(this._numTriangles, 0);
+        //     // this._numTriangles += count;
+        //     this._numTriangles = count;
+        //     this._numTriangles = Math.max(this._numTriangles, 0);
 
-            this._resetIfNecessary();
-        },
+        //     this._resetIfNecessary();
+        // },
 
         // _updateCurrentIndexData: function()
         // {
@@ -502,7 +544,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                                 gl.TRIANGLES,
                                 this._multi_draw_counts, chunk * this._maxUniformArraySize,
                                 // gl.UNSIGNED_SHORT,
-                                gl.UNSIGNED_INT,
+                                this._elements_type,
                                 // this._multi_draw_offsets, chunk * this._maxUniformArraySize,
                                 this._multi_draw_offsets_dynamic, chunk * this._maxUniformArraySize,
                                 this._multi_draw_instance_counts, chunk * this._maxUniformArraySize,
@@ -531,7 +573,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                                 gl.TRIANGLES,
                                 this._multi_draw_counts, chunk * this._maxUniformArraySize,
                                 // gl.UNSIGNED_SHORT,
-                                gl.UNSIGNED_INT,
+                                this._elements_type,
                                 this._multi_draw_offsets, chunk * this._maxUniformArraySize,
                                 Math.min(this._maxUniformArraySize, remainingDrawCount));
                         }
@@ -554,7 +596,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                             gl.TRIANGLES,
                             this._multi_draw_counts, 0,
                             // gl.UNSIGNED_SHORT,
-                            gl.UNSIGNED_INT,
+                            this._elements_type,
                             // this._multi_draw_offsets, chunk * this._maxUniformArraySize,
                             this._multi_draw_offsets_dynamic, 0,
                             this._multi_draw_instance_counts, 0,
@@ -568,7 +610,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                             gl.TRIANGLES,
                             this._multi_draw_counts, 0,
                             // gl.UNSIGNED_SHORT,
-                            gl.UNSIGNED_INT,
+                            this._elements_type,
                             this._multi_draw_offsets, 0,
                             this._numDrawingObjects);
                     }
@@ -588,7 +630,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                             this._multi_draw_counts[oid],
                             // 3,  // temp
                             // gl.UNSIGNED_SHORT,
-                            gl.UNSIGNED_INT,
+                            this._elements_type,
                             this._multi_draw_offsets[oid],
                             1,
                             this._multi_draw_base_vertices[oid],
@@ -601,7 +643,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                     // for (let i = 21800; i < this._numDrawingObjects; ++i) {
                         let oid = this._drawList[i];
                         // gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, this._multi_draw_offsets[oid]);
-                        gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_INT, this._multi_draw_offsets[oid]);
+                        gl.drawElements(gl.TRIANGLES, 3, this._elements_type, this._multi_draw_offsets[oid]);
                     }
                 }
 
@@ -623,7 +665,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                     // gl.drawArrays(gl.TRIANGLES, 0, 3);
                     // console.log("ffff");
                     // gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_SHORT, this._multi_draw_offsets[oid]);
-                    gl.drawElements(gl.TRIANGLES, 3, gl.UNSIGNED_INT, this._multi_draw_offsets[oid]);
+                    gl.drawElements(gl.TRIANGLES, 3, this._elements_type, this._multi_draw_offsets[oid]);
                 }
             }
         },
@@ -705,10 +747,10 @@ WebGLStage = Utilities.createSubclass(Stage,
             
         },
 
-        complexity: function()
-        {
-            return this._numTriangles;
-        }
+        // complexity: function()
+        // {
+        //     return this._numTriangles;
+        // }
     }
 );
 
