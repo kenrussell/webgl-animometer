@@ -17,8 +17,43 @@ cd'd into <code>src</code>:
 ./tools/perf/run_benchmark --browser=release rendering.desktop --story=animometer_webgl &gt; output.txt
 </pre>
 
+The story names include:
+```
+animometer_webgl
+animometer_webgl_multi_draw
+animometer_webgl_indexed
+animometer_webgl_indexed_multi_draw
+animometer_webgl_indexed_multi_draw_base_vertex_base_instance
+```
+
 Look for the `frame_times` measurement in particular; that is a
 good indicator of how quickly and reliably the benchmark ran.
+
+# Running locally
+
+Launch an http server at the working directory and navigate the following url in your browser
+```
+http://localhost:8080/Animometer/tests/3d/webgl.html
+```
+or
+```
+http://localhost:8080/Animometer/tests/3d/webgl-indexed-instanced.html
+```
+
+Optional url args:
+
+```
+webgl_version
+use_ubos
+use_attributes
+use_multi_draw
+use_base_vertex_base_instance
+```
+
+Example:
+```
+http://localhost:8080/Animometer/tests/3d/webgl.html?webgl_version=2&use_ubos=1&use_multi_draw=1
+```
 
 # Re-recording the WPR
 
@@ -27,7 +62,7 @@ archive in order to run the new version of the test. In this case,
 update the page set with the new URL, and run:
 
 <pre>
-./tools/perf/record_wpr --upload --browser=system rendering_desktop --story_filter=animometer_webgl
+./tools/perf/record_wpr --upload --browser=system rendering_desktop --story-filter=animometer_webgl
 </pre>
 
 # Keeping the gh-pages branch up to date
