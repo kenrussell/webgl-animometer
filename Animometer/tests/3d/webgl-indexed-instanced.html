@@ -135,7 +135,6 @@ varying vec4 v_color;
 
 void main() {
     gl_FragColor = v_color;
-    //gl_FragColor = vec4(1, 1, 1, 1);
 }
     </script>
     <script id="fragment-300es" type="x-shader/x-glsl">#version 300 es
@@ -148,7 +147,6 @@ out vec4 FragColor;
 
 void main() {
     FragColor = v_color;
-    //FragColor = vec4(1, 1, 1, 1);
 }
     </script>
     <script src="../../resources/strings.js"></script>
@@ -159,21 +157,7 @@ void main() {
     <script src="resources/webgl-indexed-instanced.js"></script>
     <script>
 var b = new WebGLStage;
-// b.initialize();
-// b.initialize(20000);
-// b.initialize(80000);
-b.initialize(2048);
-// b.initialize(100);
-// b.tune(21850);
-// b.tune(21845);
-// b.tune(21847);
-// b.tune(21847);
-// b.tune(20000);
-// b.tune(40000);
-// b.tune(80000);
-// b.tune(1024);
-// b.tune(2048);
-// console.log(Pseudo._randomCalledTimes);
+b.initialize(20000);
 var lastTime = 0.0;
 function cb(timeStamp) {
   var timeDelta = 0.0;

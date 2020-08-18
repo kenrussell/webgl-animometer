@@ -79,25 +79,19 @@ WebGLStage = Utilities.createSubclass(Stage,
 
             // storing object id (order in the index buffer) that needs rendering for current frame
             this._drawList = [];
-            // this._drawListRatio = 0.5;
-            // this._drawListUpdateFrameInterval = 99999999999999;
-            this._drawListUpdateFrameInterval = 50;
-            // this._drawListUpdateFrameInterval = 20;
-            // this._drawListUpdateFrameInterval = 10;
-            // this._drawListUpdateFrameInterval = 5;
-            // this._drawListUpdateFrameInterval = 1;
+            this._drawListUpdateFrameInterval = 1;
             this._drawListUpdateCountdown = this._drawListUpdateFrameInterval;
             this._numDrawingObjects = 0;
 
             this._drawListSet = [];
             this._curDrawListId = 0;
 
-            // this._drawListSet.push([...Array(this._numTriangles).keys()]);
+            // switch between different set of active objects to draw
+            this._drawListSet.push([...Array(this._numTriangles).keys()]);
             this._drawListSet.push([10, 20, 30, 1000]);
-            this._drawListSet.push([30, 1001, 1002, 1003]);
-            // this._drawListSet.push([...Array(this._numTriangles / 4).keys()]);
-            // this._drawListSet.push([...Array(this._numTriangles / 2).keys()].map(x => x + 100));
-            // this._drawListSet.push([...Array(this._numTriangles / 8).keys()].map(x => x * 4));
+            this._drawListSet.push([...Array(this._numTriangles / 4).keys()]);
+            this._drawListSet.push([...Array(this._numTriangles / 2).keys()].map(x => x + 100));
+            this._drawListSet.push([...Array(this._numTriangles / 8).keys()].map(x => x * 4));
 
             var use_ubos = this._params.use_ubos;
             var use_attributes = this._params.use_attributes;
@@ -290,8 +284,8 @@ WebGLStage = Utilities.createSubclass(Stage,
                 
                 // Indices data here are added with extra offset
                 for (let i = 0; i < this._bufferSize; ++i) {
-                    // assume geometries are all triangles (3 vertices per drawing object)
-                    let o = i * 3;  // assume this._indexData.length = 3;
+                    // assume all geometries are triangles (3 vertices per drawing object)
+                    let o = i * 3;
                     indexData[o] = this._indexData[0] + o;
                     indexData[o + 1] = this._indexData[1] + o;
                     indexData[o + 2] = this._indexData[2] + o;
@@ -300,12 +294,14 @@ WebGLStage = Utilities.createSubclass(Stage,
             else
             {
                 // Directly copy the original indexData into indexBuffer
+                // because there will be baseVertices array passed to draw call
                 for (let i = 0; i < this._bufferSize; ++i) {
                     indexData.set(this._indexData, i * this._indexData.length);
                 }
             }
 
             if (use_ubos) {
+                console.log('use_ubos setup');
                 this._transformData = new Float32Array(this._bufferSize * 8);
                 this._transformDataOriginal = new Float32Array(this._bufferSize * 8);
                 for (let i = 0; i < this._bufferSize; ++i) {
@@ -364,6 +360,7 @@ WebGLStage = Utilities.createSubclass(Stage,
                 gl.vertexAttribPointer(this._aScalar,       1, gl.FLOAT, false, 5 * 4, 3 * 4);
                 gl.vertexAttribPointer(this._aScalarOffset, 1, gl.FLOAT, false, 5 * 4, 4 * 4);
             } else {
+                console.log('use separate uniforms setup');
                 this._uniformData = new Float32Array(this._bufferSize * 6);
                 for (let i = 0; i < this._bufferSize; ++i) {
                     this._uniformData[i * 6 + 0] = Stage.random(0.2, 0.4);
@@ -388,6 +385,7 @@ WebGLStage = Utilities.createSubclass(Stage,
             this._indexBuffer = gl.createBuffer();
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
             // when use_base_vertex_base_instance we don't need to update index buffer data
+            // which may (or may not) help improve performance (depends on browser implementation)
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, use_base_vertex_base_instance ? gl.STATIC_DRAW : gl.DYNAMIC_DRAW);
 
             this._updateDrawList(gl, true);
@@ -414,6 +412,10 @@ WebGLStage = Utilities.createSubclass(Stage,
             if (this._params.use_multi_draw) {
                 gl.uniform1f(this._uTime, elapsedTime);
                 if (this._params.use_ubos) {
+                    
+                    // multi_draw
+                    // use_ubos
+
                     let remainingDrawCount = this._numDrawingObjects;
 
                     for (let chunk = 0, count = Math.ceil(this._numDrawingObjects / this._maxUniformArraySize); chunk < count; chunk++) {
@@ -495,6 +497,10 @@ WebGLStage = Utilities.createSubclass(Stage,
 
                 
             } else {
+
+                // non multi_draw
+                // separate uniforms
+
                 for (let i = 0; i < this._numDrawingObjects; ++i) {
                     let oid = this._drawList[i];
                     this._uniformData[oid * 6 + 1] = elapsedTime;
@@ -526,12 +532,12 @@ WebGLStage = Utilities.createSubclass(Stage,
                     this._multi_draw_offsets_dynamic[i] = this._multi_draw_offsets[id];
                 }
             }
-            // update this._multi_draw_counts data etc.
             else if (this._params.use_multi_draw) {
                 let id;
                 for (let i = 0; i < this._numDrawingObjects; i++) {
                     id = this._drawList[i];
                     // update index data and upload
+                    // assume all geometries are triangles (3 vertices per drawing object)
                     let o = i * 3;  // offset in currentIndexData
                     let oid = id * 3;   // offset of it's first index in originalIndexData
                     this._currentIndexData[o] = this._originalIndexData[oid];
@@ -542,11 +548,10 @@ WebGLStage = Utilities.createSubclass(Stage,
 
             }
 
-            // if not using multi_draw then there's
-            // no need to update draw list data
+            // if not using multi_draw then there's no need to update draw list data
 
             if (this._params.use_ubos && updateUboTransformData) {
-                // update transform data
+                // update transform data as orders are messed up
                 let id;
                 for (let i = 0; i < this._numDrawingObjects; i++) {
                     id = this._drawList[i];
@@ -559,14 +564,10 @@ WebGLStage = Utilities.createSubclass(Stage,
                     this._transformData[o + 4] = this._transformDataOriginal[oid + 4];
                 }
                 this._uploadUboTransformData(gl);
-
-                console.log(this._transformData.slice(0, 4 * 8));
-                // console.log(this._transformDataOriginal);
             }
         },
 
         _uploadUboTransformData: function(gl) {
-            // const uniformBufferCount = Math.ceil(this._bufferSize / this._maxUniformArraySize);
             const uniformBufferCount = Math.ceil(this._numDrawingObjects / this._maxUniformArraySize);
             for (let i = 0; i < uniformBufferCount; ++i) {
                 const buffer = this._uniformBuffers[i];
