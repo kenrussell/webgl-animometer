@@ -47,7 +47,14 @@ webgl_version
 use_ubos
 use_attributes
 use_multi_draw
+```
+
+Optional args only for `webgl-indexed-instanced`:
+
+```
 use_base_vertex_base_instance
+num_geometries
+draw_list_update_interval
 ```
 
 Example:

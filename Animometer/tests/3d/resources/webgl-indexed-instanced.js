@@ -11,7 +11,7 @@ WebGLStage = Utilities.createSubclass(Stage,
     },
     {
 
-        initialize: function(count, benchmark, options)
+        initialize: function(defaultCount, benchmark, options)
         {
             Stage.prototype.initialize.call(this, benchmark, options);
 
@@ -22,6 +22,8 @@ WebGLStage = Utilities.createSubclass(Stage,
                 use_multi_draw: Boolean(params.get("use_multi_draw")),
                 use_base_vertex_base_instance: Boolean(params.get("use_base_vertex_base_instance")),
                 webgl_version: WebGL2Supported() ? (Number(params.get("webgl_version")) || 1) : 1,
+                num_geometries: Number(params.get("num_geometries")),
+                draw_list_update_interval: Number(params.get("draw_list_update_interval")),
             };
 
             if (this._params.webgl_version == 2) {
@@ -31,7 +33,7 @@ WebGLStage = Utilities.createSubclass(Stage,
             }
             var gl = this._gl;
 
-            this._numTriangles = Math.max(count, 0);
+            this._numTriangles = Math.max(this._params.num_geometries ? this._params.num_geometries : defaultCount, 0);
             this._use_element_index_uint = false;
             console.log("numTriangles: " + this._numTriangles);
             if (this._numTriangles * 3 > (1 << 16)) {
@@ -79,7 +81,7 @@ WebGLStage = Utilities.createSubclass(Stage,
 
             // storing object id (order in the index buffer) that needs rendering for current frame
             this._drawList = [];
-            this._drawListUpdateFrameInterval = 1;
+            this._drawListUpdateFrameInterval = this._params.draw_list_update_interval ? this._params.draw_list_update_interval : 1;
             this._drawListUpdateCountdown = this._drawListUpdateFrameInterval;
             this._numDrawingObjects = 0;
 
